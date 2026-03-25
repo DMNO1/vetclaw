@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,17 +19,21 @@ app = FastAPI(title="VetClaw", version="1.0.0", description="宠物医院AI技�
 
 BASE_DIR = Path(__file__).parent
 CONFIG_DIR = BASE_DIR / "config"
-TEMPLATES_DIR = BASE_DIR / "templates"
-STATIC_DIR = BASE_DIR / "static"
-DB_PATH = BASE_DIR / "data" / "vetclaw.db"
 
-# Ensure dirs
-TEMPLATES_DIR.mkdir(exist_ok=True)
-STATIC_DIR.mkdir(exist_ok=True)
-(DB_PATH.parent).mkdir(exist_ok=True)
+# Conditional template/static mounting (Vercel serverless has read-only fs)
+templates = None
+if (BASE_DIR / "templates").exists():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+if (BASE_DIR / "static").exists():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+# Use in-memory DB for serverless (Vercel has read-only fs except /tmp)
+DB_PATH = os.environ.get("VETCLAW_DB_PATH", ":memory:")
+if DB_PATH != ":memory:":
+    DB_PATH = str(BASE_DIR / "data" / "vetclaw.db")
+    (Path(DB_PATH).parent).mkdir(exist_ok=True)
 
 # ─── Knowledge Base ───
 def load_knowledge_base() -> dict:
@@ -655,7 +657,26 @@ def route_message(message: str) -> tuple:
 # ─── API Routes ───
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    if templates:
+        return templates.TemplateResponse("index.html", {"request": request})
+    # Fallback inline HTML for Vercel serverless
+    return HTMLResponse("""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VetClaw 宠物医院AI助手</title>
+<style>body{font-family:system-ui;max-width:600px;margin:0 auto;padding:20px;background:#f5f5f5}
+.chat{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.msg{margin:8px 0;padding:10px 14px;border-radius:8px;max-width:80%}
+.bot{background:#e3f2fd;margin-right:auto}.user{background:#4caf50;color:#fff;margin-left:auto;text-align:right}
+input{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box}
+button{margin-top:8px;padding:10px 20px;background:#4caf50;color:#fff;border:none;border-radius:8px;cursor:pointer;width:100%}</style>
+</head><body><div class="chat"><h2>🐾 VetClaw 宠物医院AI助手</h2>
+<div id="msgs"></div>
+<input id="inp" placeholder="输入消息..." onkeydown="if(event.key==='Enter')send()">
+<button onclick="send()">发送</button></div>
+<script>const M=document.getElementById('msgs'),I=document.getElementById('inp');
+function add(t,c){const d=document.createElement('div');d.className='msg '+c;d.textContent=t;M.appendChild(d);M.scrollTop=M.scrollHeight}
+async function send(){const m=I.value.trim();if(!m)return;add(m,'user');I.value='';const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m,session_id:'demo'})});const d=await r.json();add(d.response,'bot')}
+add('您好！我是VetClaw宠物医院AI助手，请问有什么可以帮您？','bot');</script></body></html>""")
 
 @app.post("/api/chat")
 async def chat(request: Request):
@@ -713,6 +734,13 @@ async def stats():
         }
     finally:
         conn.close()
+
+# Vercel serverless handler
+try:
+    from mangum import Mangum
+    handler = Mangum(app)
+except ImportError:
+    handler = app
 
 if __name__ == "__main__":
     import uvicorn
