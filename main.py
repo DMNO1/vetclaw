@@ -29,11 +29,12 @@ if (BASE_DIR / "static").exists():
     from fastapi.staticfiles import StaticFiles
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
-# Use in-memory DB for serverless (Vercel has read-only fs except /tmp)
-DB_PATH = os.environ.get("VETCLAW_DB_PATH", ":memory:")
-if DB_PATH != ":memory:":
-    DB_PATH = str(BASE_DIR / "data" / "vetclaw.db")
-    (Path(DB_PATH).parent).mkdir(exist_ok=True)
+# Use /tmp for Vercel serverless (writable), local data dir otherwise
+if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
+    DB_PATH = os.environ.get("VETCLAW_DB_PATH", "/tmp/vetclaw.db")
+else:
+    DB_PATH = os.environ.get("VETCLAW_DB_PATH", str(BASE_DIR / "data" / "vetclaw.db"))
+    (Path(DB_PATH).parent).mkdir(parents=True, exist_ok=True)
 
 # ─── Knowledge Base ───
 def load_knowledge_base() -> dict:
