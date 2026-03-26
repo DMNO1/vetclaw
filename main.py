@@ -27,8 +27,7 @@ if (BASE_DIR / "templates").exists():
     templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 if (BASE_DIR / "static").exists():
     from fastapi.staticfiles import StaticFiles
-    if (Path(__file__).parent / "static").exists():
-        app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+    app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 # Use /tmp for Vercel serverless (writable), local data dir otherwise
 if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
@@ -231,9 +230,14 @@ def handle_appointment(message: str, config: dict) -> str:
 
         conn = get_db()
         try:
+            # Use most recent client/pet instead of hardcoded IDs
+            row = conn.execute("SELECT id FROM clients ORDER BY id DESC LIMIT 1").fetchone()
+            client_id = row["id"] if row else None
+            row = conn.execute("SELECT id FROM pets ORDER BY id DESC LIMIT 1").fetchone()
+            pet_id = row["id"] if row else None
             conn.execute("""INSERT INTO appointments (pet_id, client_id, doctor, service_type,
-                          appointment_time, status) VALUES (1, 1, '待分配', ?, ?, 'confirmed')""",
-                        (service, time_str))
+                          appointment_time, status) VALUES (?, ?, '待分配', ?, ?, 'confirmed')""",
+                        (pet_id, client_id, service, time_str))
             conn.commit()
             return (f"✅ 预约成功！\n"
                    f"服务：{service}\n"
