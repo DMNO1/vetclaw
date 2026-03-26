@@ -8,8 +8,7 @@ import sys
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from mangum import Mangum
 from main import app
 
-# Mangum adapter for ASGI (FastAPI) -> AWS Lambda / Vercel serverless
-handler = Mangum(app, lifespan="off")
+# Vercel @vercel/python auto-detects FastAPI 'app' directly
+# No Mangum wrapper needed - Vercel handles ASGI natively
