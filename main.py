@@ -32,7 +32,11 @@ if (BASE_DIR / "static").exists():
         if (Path(__file__).parent / "static").exists():
 
 
-            app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+            if (Path(__file__).parent / "static").exists():
+
+
+
+                app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 # Use /tmp for Vercel serverless (writable), local data dir otherwise
 if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
