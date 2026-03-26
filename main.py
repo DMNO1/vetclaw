@@ -27,27 +27,7 @@ if (BASE_DIR / "templates").exists():
     templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 if (BASE_DIR / "static").exists():
     from fastapi.staticfiles import StaticFiles
-    if (Path(__file__).parent / "static").exists():
-
-        if (Path(__file__).parent / "static").exists():
-
-
-            if (Path(__file__).parent / "static").exists():
-
-
-
-                if (Path(__file__).parent / "static").exists():
-
-
-
-
-                    if (Path(__file__).parent / "static").exists():
-
-
-
-
-
-                        app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+    app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 # Use /tmp for Vercel serverless (writable), local data dir otherwise
 if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
