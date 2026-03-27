@@ -1,13 +1,15 @@
 """
 VetClaw - Vercel Serverless Entry Point
-Direct ASGI export (Vercel Python runtime supports ASGI natively)
+Wraps the FastAPI app for Vercel Python runtime using Mangum (ASGI→WSGI)
 """
 import os
 import sys
-import traceback
+import logging
 import pathlib
 
-# Path setup
+logger = logging.getLogger("vetclaw.vercel")
+
+# Ensure project root is in path
 project_root = str(pathlib.Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -16,18 +18,25 @@ os.environ.setdefault("DATABASE_PATH", "/tmp/vetclaw.db")
 
 try:
     from main import app
-except Exception as _e:
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
+    logger.info("VetClaw handler created successfully")
+except Exception as e:
+    logger.error(f"VetClaw app import failed: {e}", exc_info=True)
     # Diagnostic fallback
     from flask import Flask, jsonify
-    app = Flask(__name__)
+    import traceback
+    _fallback = Flask(__name__)
 
-    @app.route("/")
-    @app.route("/<path:path>")
+    @_fallback.route("/")
+    @_fallback.route("/<path:path>")
     def _diag(path=""):
         return jsonify({
             "error": "VetClaw init failed",
-            "detail": str(_e),
+            "detail": str(e),
             "traceback": traceback.format_exc(),
             "python": sys.version,
             "path": sys.path[:5],
         }), 500
+
+    handler = _fallback
