@@ -1,29 +1,19 @@
 """
-VetClaw - Vercel Serverless Entry Point (Final)
-Direct FastAPI ASGI export with fallback error handling.
-Note: Vercel Python runtime has configuration issues.
-Railway/Docker deployment recommended.
+VetClaw - Vercel Serverless Entry Point (Mangum WSGI handler)
 """
 import os
 import sys
+from pathlib import Path
 
-# Ensure project root is in path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
+# Fix path: api/index.py -> project root
+project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-try:
-    from main import app
-except Exception as e:
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-    app = FastAPI(title="VetClaw (Error)")
+# Ensure /tmp exists for SQLite and writable dirs
+os.environ.setdefault("DATABASE_PATH", "/tmp/vetclaw.db")
 
-    @app.get("/")
-    @app.get("/{path:path}")
-    async def error_handler(path: str = ""):
-        return JSONResponse(
-            status_code=503,
-            content={"error": "Vercel config issue", "detail": str(e), "solution": "Use Railway/Docker"}
-        )
+from main import app
+from mangum import Mangum
+
+handler = Mangum(app, lifespan="off")
