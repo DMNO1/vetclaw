@@ -129,7 +129,14 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
+# Initialize DB with error handling for Vercel serverless
+DB_ENABLED = True
+try:
+    init_db()
+except Exception as e:
+    print(f"[WARN] Database initialization failed: {e}")
+    print("[WARN] Running in memory-only mode (no persistence)")
+    DB_ENABLED = False
 
 # ─── DeepSeek LLM (optional) ───
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
